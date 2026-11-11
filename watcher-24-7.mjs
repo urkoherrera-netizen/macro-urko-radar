@@ -1,6 +1,3 @@
-New-Item -ItemType Directory -Force -Path ".github/workflows" | Out-Null
-
-@'
 import fs from 'node:fs';
 
 const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -41,9 +38,6 @@ const STOCKS = [
   { name: '₿ Bitcoin Spot ETF', ticker: 'IBIT', td: 'IBIT', fx: false, mult: 1, cur: '$', beta: 1.90, zombi: false, act: 52.00 },
   { name: '🛢️ Petróleo Texas', ticker: 'CL=F', td: 'USO', fx: false, mult: 1, cur: '$', beta: 1.50, zombi: false, act: 69.20 }
 ];
-'@ | Set-Content -Path "watcher-24-7.mjs" -Encoding UTF8
-Write-Host "PARTE_1_OK"
-@'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function sendTG(text) {
@@ -69,10 +63,10 @@ async function fetchMacroGap() {
   try {
     const ecbUrl = ['ht', 'tps:/', '/data-api.', 'ecb.europa.eu/service/data/FM/D.U2.EUR.4F.KR.DFR.LEV?lastNObservations=1&format=jsondata'].join('');
     const ev = await (await fetch(ecbUrl)).json();
-    const d = ev?.dataSets?.[0];
-    const sr = d?.series ? Object.values(d.series)[0] : null;
-    const o = sr?.observations ? Object.values(sr.observations)[0] : null;
-    if (Array.isArray(o) && o[0] !== undefined) rate = parseFloat(o[0]);
+    const d = Array.isArray(ev?.dataSets) ? ev.dataSets.at(0) : null;
+    const sr = d?.series ? Object.values(d.series).at(0) : null;
+    const o = sr?.observations ? Object.values(sr.observations).at(0) : null;
+    if (Array.isArray(o) && o.at(0) !== undefined) rate = parseFloat(o.at(0));
   } catch {}
   try {
     const infUrl = ['ht', 'tps:/', '/ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/prc_hicp_manr?coicop=CP00&geo=EA&lastTimePeriod=1'].join('');
@@ -126,13 +120,34 @@ async function main() {
     if (fs.existsSync('state.json')) state = { ...state, ...JSON.parse(fs.readFileSync('state.json', 'utf8')) };
   } catch {}
 
+  const isFirstBoot = !state.zone;
   const macro = await fetchMacroGap();
   const zoneObj = getZone(macro.gap);
   const prices = await fetchAllPrices(state.prices);
   const messages = [];
 
-  if (state.zone && state.zone !== zoneObj.id) {
-    messages.push(`🧭 <b>CAMBIO DE RÉGIMEN MACRO F2</b>\nNuevo Ciclo: <b>${zoneObj.label}</b>\n📊 GAP Liquidez F2: <b>${macro.gap >= 0 ? '+' : ''}${macro.gap.toFixed(2)}%</b>\n🛡️ Distribución Táctica: <b>${zoneObj.alloc}</b>`);
+  if (isFirstBoot) {
+    const top3 = STOCKS
+      .filter((s) => !s.zombi && prices[s.ticker])
+      .map((s) => ({ ...s, pot: Number((Math.max(1.5, macro.gap * 2.8) * s.beta).toFixed(1)) }))
+      .sort((a, b) => b.pot - a.pot)
+      .slice(0, 3)
+      .map((s, idx) => `${idx + 1}. <b>${s.name}</b> (${prices[s.ticker]} ${s.cur}) • Pot. +${s.pot}%`)
+      .join('\n');
+
+    messages.push(
+      `🚀 <b>VIGILANTE MACROPULSE 24/7 ACTIVADO</b>\n` +
+      `🧭 Régimen Actual: <b>${zoneObj.label}</b> (GAP ${macro.gap >= 0 ? '+' : ''}${macro.gap.toFixed(2)}%)\n` +
+      `🛡️ Distribución Táctica: <b>${zoneObj.alloc}</b>\n\n` +
+      `🏆 <b>TOP 3 MAYOR RECORRIDO AHORA:</b>\n${top3}`
+    );
+  } else if (state.zone !== zoneObj.id) {
+    messages.push(
+      `🧭 <b>CAMBIO DE RÉGIMEN MACRO F2</b>\n` +
+      `Nuevo Ciclo: <b>${zoneObj.label}</b>\n` +
+      `📊 GAP Liquidez F2: <b>${macro.gap >= 0 ? '+' : ''}${macro.gap.toFixed(2)}%</b>\n` +
+      `🛡️ Distribución Táctica: <b>${zoneObj.alloc}</b>`
+    );
   }
   state.zone = zoneObj.id;
 
@@ -175,7 +190,7 @@ async function main() {
 
   const madridStr = new Date().toLocaleString('en-GB', { timeZone: 'Europe/Madrid' });
   const [datePart, timePart] = madridStr.split(', ');
-  const hour = Number(timePart.split(':')[0]);
+  const hour = Number(timePart.split(':').at(0));
   const slot = hour === 9 ? `${datePart}-OPEN` : hour === 22 ? `${datePart}-CLOSE` : null;
 
   if (slot && state.lastDigest !== slot) {
@@ -198,34 +213,3 @@ async function main() {
 }
 
 main();
-'@ | Add-Content -Path "watcher-24-7.mjs" -Encoding UTF8
-Write-Host "PARTE_2_OK"
-@'
-name: MacroPulse Vigilante 24-7
-on:
-  schedule:
-    - cron: '*/15 * * * 1-5'
-  workflow_dispatch:
-permissions:
-  contents: write
-jobs:
-  radar:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - name: Ejecutar Radar MacroPulse 24/7
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        run: node watcher-24-7.mjs
-      - name: Guardar memoria del radar
-        run: |
-          git config user.name "MacroPulse Bot"
-          git config user.email "bot@macropulse.local"
-          git add state.json
-          git diff --staged --quiet || git commit -m "chore: update radar state"
-          git push
-'@ | Set-Content -Path ".github/workflows/radar-24-7.yml" -Encoding UTF8
-Write-Host "WORKFLOW_24_7_OK"
