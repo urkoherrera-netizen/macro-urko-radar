@@ -1,0 +1,26 @@
+name: MacroPulse Vigilante 24-7
+on:
+  schedule:
+    - cron: '*/15 * * * 1-5'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Ejecutar Radar MacroPulse 24/7
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: node watcher-24-7.mjs
+      - name: Guardar memoria del radar
+        run: |
+          git config user.name "MacroPulse Bot"
+          git config user.email "bot@macropulse.local"
+          git add state.json
+          git diff --staged --quiet || git commit -m "chore: update radar state"
+          git push
