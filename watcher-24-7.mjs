@@ -38,6 +38,8 @@ const STOCKS = [
   { name: '₿ Bitcoin Spot ETF', ticker: 'IBIT', td: 'IBIT', fx: false, mult: 1, cur: '$', beta: 1.90, zombi: false, act: 52.00 },
   { name: '🛢️ Petróleo Texas', ticker: 'CL=F', td: 'USO', fx: false, mult: 1, cur: '$', beta: 1.50, zombi: false, act: 69.20 }
 ];
+
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function sendTG(text) {
